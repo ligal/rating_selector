@@ -1,0 +1,10 @@
+{
+  "files": {
+    "main.js": "/rating_selector/static/js/main.b2273ca2.js",
+    "index.html": "/rating_selector/index.html",
+    "main.b2273ca2.js.map": "/rating_selector/static/js/main.b2273ca2.js.map"
+  },
+  "entrypoints": [
+    "static/js/main.b2273ca2.js"
+  ]
+}
