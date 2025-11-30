@@ -6,8 +6,8 @@
   "scripts": {
     "start": "react-scripts start",
     "build": "react-scripts build",
-    "predeploy": "react-scripts predeploy",
-    "deploy": "react-scripts deploy"
+    "predeploy": "predeploy",
+    "deploy": "deploy"
   },
   "dependencies": {
     "lucide-react": "^0.395.0",
