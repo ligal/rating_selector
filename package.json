@@ -6,8 +6,8 @@
   "scripts": {
     "start": "react-scripts start",
     "build": "react-scripts build",
-    "predeploy": "predeploy",
-    "deploy": "deploy"
+    "predeploy": "npm run build",     
+    "deploy": "gh-pages -d build"
   },
   "dependencies": {
     "lucide-react": "^0.395.0",
