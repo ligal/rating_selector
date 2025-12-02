@@ -47,6 +47,9 @@ const App = () => {
   const synthRef = useRef(null);
   const ToneRef = useRef(null); 
   const clearTimeoutRef = useRef(null);
+  const videoRef = useRef(null);
+  const cameraStreamRef = useRef(null);
+  const [cameraReady, setCameraReady] = useState(false);
 
   // --- Audio Setup Logic (Tone.js) ---
   useEffect(() => {
@@ -100,6 +103,36 @@ const App = () => {
     loadToneScript();
     
   }, []); 
+
+  // Camera setup: request webcam and attach to video element
+  useEffect(() => {
+    const startCamera = async () => {
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        console.warn("getUserMedia not supported in this browser.");
+        return;
+      }
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+        cameraStreamRef.current = stream;
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+          // call play but ignore any play promise rejection (autoplay policies)
+          await videoRef.current.play().catch(() => {});
+        }
+        setCameraReady(true);
+      } catch (e) {
+        console.error("Failed to access camera:", e);
+      }
+    };
+    startCamera();
+    return () => {
+      if (cameraStreamRef.current) {
+        cameraStreamRef.current.getTracks().forEach(t => t.stop());
+        cameraStreamRef.current = null;
+      }
+      setCameraReady(false);
+    };
+  }, []);
 
   // Function to ensure Tone is started (required for mobile browsers)
   const startAudioContext = useCallback(() => {
@@ -190,6 +223,17 @@ const App = () => {
     <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4 font-sans antialiased">
       <div className="w-full max-w-lg bg-white shadow-2xl rounded-2xl p-6 md:p-8">
         
+        {/* Camera Feed */}
+        <div className="mb-4 flex items-center justify-center">
+          <video
+            ref={videoRef}
+            className="w-full max-w-md rounded-xl border-2 bg-black"
+            playsInline
+            muted
+            autoPlay
+          />
+        </div>
+
         {/* Header and Current Selection Display */}
         <div className="mb-8 text-center">
           <h1 className="text-3xl font-extrabold text-gray-800 mb-2">
