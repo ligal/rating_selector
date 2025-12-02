@@ -46,6 +46,7 @@ const App = () => {
   const [isAudioReady, setIsAudioReady] = useState(false);
   const synthRef = useRef(null);
   const ToneRef = useRef(null); 
+  const clearTimeoutRef = useRef(null);
 
   // --- Audio Setup Logic (Tone.js) ---
   useEffect(() => {
@@ -130,14 +131,35 @@ const App = () => {
     if (!isAudioReady) return;
 
     startAudioContext();
-    
+
+    // If tapping the already-selected rating, deselect immediately and cancel any pending auto-clear.
     if (selectedRating === ratingId) {
+      if (clearTimeoutRef.current) {
+        clearTimeout(clearTimeoutRef.current);
+        clearTimeoutRef.current = null;
+      }
       setSelectedRating(null);
       playDeselectionSound();
-    } else {
-      setSelectedRating(ratingId);
-      playSelectionSound(ratingId);
+      return;
     }
+
+    // Selecting a new rating: cancel any existing timeout, set selection and play sound,
+    // then schedule an auto-clear after 500ms.
+    if (clearTimeoutRef.current) {
+      clearTimeout(clearTimeoutRef.current);
+      clearTimeoutRef.current = null;
+    }
+
+    setSelectedRating(ratingId);
+    playSelectionSound(ratingId);
+
+    // Auto-clear after 500ms
+    clearTimeoutRef.current = setTimeout(() => {
+      startAudioContext();
+      setSelectedRating(null);
+      playDeselectionSound();
+      clearTimeoutRef.current = null;
+    }, 500);
   };
 
   /**
@@ -145,12 +167,25 @@ const App = () => {
    */
   const handleClear = () => {
     if (selectedRating && isAudioReady) {
+        if (clearTimeoutRef.current) {
+            clearTimeout(clearTimeoutRef.current);
+            clearTimeoutRef.current = null;
+        }
         startAudioContext();
         setSelectedRating(null);
         playDeselectionSound();
     }
   };
 
+  // Cleanup pending auto-clear timeout on unmount to avoid leaks or state updates after unmount.
+  useEffect(() => {
+    return () => {
+      if (clearTimeoutRef.current) {
+        clearTimeout(clearTimeoutRef.current);
+        clearTimeoutRef.current = null;
+      }
+    };
+  }, []);
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4 font-sans antialiased">
       <div className="w-full max-w-lg bg-white shadow-2xl rounded-2xl p-6 md:p-8">
