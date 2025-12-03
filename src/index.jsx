@@ -50,6 +50,7 @@ const App = () => {
   const videoRef = useRef(null);
   const cameraStreamRef = useRef(null);
   const [cameraReady, setCameraReady] = useState(false);
+  const [cameraEnabled, setCameraEnabled] = useState(true);
 
   // --- Audio Setup Logic (Tone.js) ---
   useEffect(() => {
@@ -104,8 +105,9 @@ const App = () => {
     
   }, []); 
 
-  // Camera setup: request webcam and attach to video element
+  // Camera setup: request webcam and attach to video element (toggleable)
   useEffect(() => {
+    let mounted = true;
     const startCamera = async () => {
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
         console.warn("getUserMedia not supported in this browser.");
@@ -113,10 +115,13 @@ const App = () => {
       }
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+        if (!mounted) {
+          if (stream && stream.getTracks) stream.getTracks().forEach(t => t.stop());
+          return;
+        }
         cameraStreamRef.current = stream;
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
-          // call play but ignore any play promise rejection (autoplay policies)
           await videoRef.current.play().catch(() => {});
         }
         setCameraReady(true);
@@ -124,15 +129,31 @@ const App = () => {
         console.error("Failed to access camera:", e);
       }
     };
-    startCamera();
+
+    // Start camera only when enabled
+    if (cameraEnabled) {
+      startCamera();
+    } else {
+      // If disabled ensure any previous stream is stopped
+      if (cameraStreamRef.current) {
+        cameraStreamRef.current.getTracks().forEach(t => t.stop());
+        cameraStreamRef.current = null;
+      }
+      if (videoRef.current) {
+        videoRef.current.srcObject = null;
+      }
+      setCameraReady(false);
+    }
+
     return () => {
+      mounted = false;
       if (cameraStreamRef.current) {
         cameraStreamRef.current.getTracks().forEach(t => t.stop());
         cameraStreamRef.current = null;
       }
       setCameraReady(false);
     };
-  }, []);
+  }, [cameraEnabled]);
 
   // Function to ensure Tone is started (required for mobile browsers)
   const startAudioContext = useCallback(() => {
@@ -224,7 +245,7 @@ const App = () => {
       <div className="w-full max-w-lg bg-white shadow-2xl rounded-2xl p-6 md:p-8">
         
         {/* Camera Feed */}
-        <div className="mb-4 flex items-center justify-center">
+        <div className="mb-4 flex flex-col items-center justify-center">
           <video
             ref={videoRef}
             className="w-full max-w-md rounded-xl border-2 bg-black"
@@ -232,6 +253,14 @@ const App = () => {
             muted
             autoPlay
           />
+          <button
+            onClick={() => setCameraEnabled(enabled => !enabled)}
+            className="mt-3 inline-flex items-center px-3 py-2 bg-gray-100 hover:bg-gray-200 text-sm rounded-md border"
+            aria-pressed={cameraEnabled}
+            aria-label={cameraEnabled ? "Disable camera" : "Enable camera"}
+          >
+            {cameraEnabled ? 'Turn Camera Off' : 'Turn Camera On'}
+          </button>
         </div>
 
 
