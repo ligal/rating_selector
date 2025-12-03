@@ -234,33 +234,8 @@ const App = () => {
           />
         </div>
 
-        {/* Header and Current Selection Display */}
-        <div className="mb-8 text-center">
-          <h1 className="text-3xl font-extrabold text-gray-800 mb-2">
-            Interactive Rater
-          </h1>
-          <p className="text-gray-500">
-            Listen for the different sounds when you make a selection!
-          </p>
-          <div className="mt-4 p-3 border-4 border-dashed rounded-xl transition-all duration-300 min-h-[50px] flex items-center justify-center">
-            {selectedRating ? (
-              <p className="text-xl font-bold transition-transform transform duration-300 scale-100">
-                Selected: 
-                <span className={`ml-2 px-3 py-1 rounded-lg text-white ${
-                  selectedRating === 'good' ? 'bg-emerald-600' :
-                  selectedRating === 'ok' ? 'bg-amber-600' :
-                  'bg-red-600'
-                }`}>
-                  {ratingOptions.find(o => o.id === selectedRating).label}
-                </span>
-              </p>
-            ) : (
-              <p className="text-lg text-gray-400 italic">
-                No rating selected.
-              </p>
-            )}
-          </div>
-        </div>
+
+
 
         {/* Rating Buttons Container */}
         <div className="grid grid-cols-3 gap-4">
@@ -295,37 +270,11 @@ const App = () => {
           })}
         </div>
 
-        {/* Clear Button */}
-        <div className="mt-6">
-            <button
-                onClick={handleClear}
-                disabled={!selectedRating || !isAudioReady}
-                className="w-full flex items-center justify-center p-3 rounded-xl bg-gray-200 text-gray-600 font-semibold transition-all duration-300 hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed shadow-inner"
-            >
-                <Trash2 className="w-5 h-5 mr-2" />
-                Clear Selection
-            </button>
-        </div>
 
-        {/* Status and Instructions */}
-        <div className="mt-8 text-center">
-            {!isAudioReady ? (
-                <div className="flex items-center justify-center text-sm text-blue-500 italic">
-                    <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-blue-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
-                    Loading sound engine... Please wait a moment.
-                </div>
-            ) : (
-                <p className="text-sm text-emerald-600 font-medium">
-                    Audio Ready! Select an option to hear its unique tone.
-                </p>
-            )}
-            <p className="mt-2 text-xs text-gray-400">
-                *Tap the selected option again to deselect it.
-            </p>
-        </div>
+
+
+
+
       </div>
     </div>
   );
