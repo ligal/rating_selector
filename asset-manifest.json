@@ -1,10 +1,10 @@
 {
   "files": {
-    "main.js": "/rating_selector/static/js/main.3cce5aa4.js",
+    "main.js": "/rating_selector/static/js/main.8b15df48.js",
     "index.html": "/rating_selector/index.html",
-    "main.3cce5aa4.js.map": "/rating_selector/static/js/main.3cce5aa4.js.map"
+    "main.8b15df48.js.map": "/rating_selector/static/js/main.8b15df48.js.map"
   },
   "entrypoints": [
-    "static/js/main.3cce5aa4.js"
+    "static/js/main.8b15df48.js"
   ]
 }
