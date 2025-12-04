@@ -55,6 +55,8 @@ const App = () => {
   const [showWords, setShowWords] = useState(false);
   const [displayedWords, setDisplayedWords] = useState([]);
   const wordsTimeoutRef = useRef(null);
+  const speechCancelRef = useRef(null);
+  const [isSpeaking, setIsSpeaking] = useState(false);
 
   // --- Audio Setup Logic (Tone.js) ---
   useEffect(() => {
@@ -249,23 +251,19 @@ const App = () => {
     };
   }, []);
 
-  // Handler to show N random words (reads public/words.txt)
+  // Handler to show N random words (reads public/words.txt) and speak them in Hebrew
   const handleNumberClick = async (n) => {
     try {
-      // Hide the buttons
+      // Hide the numeric buttons and clear any previous UI
       setExtraButtonsVisible(false);
       setShowWords(false);
+      setIsSpeaking(false);
 
-      // Fetch words file (served from public/words.txt). Use PUBLIC_URL (for subpath deployments)
-      // and fallback to a built-in list if the server returns HTML (common when file is missing
-      // and the host rewrites to index.html).
       const base = (process.env.PUBLIC_URL || '');
       const res = await fetch(`${base}/words.txt`);
       let text = '';
       if (res.ok) {
         text = await res.text();
-        // Some hosting setups return index.html for unknown routes (SPA rewrite).
-        // Detect if the response looks like HTML and fall back to the built-in list.
         if (/\<\s*html/i.test(text) || /\<\s*head/i.test(text)) {
           console.warn('words.txt fetch returned HTML (likely missing). Using fallback list.');
           text = '';
@@ -288,16 +286,181 @@ const App = () => {
       setDisplayedWords(selected);
       setShowWords(true);
 
-      // After 3 seconds, hide words and restore buttons
-      wordsTimeoutRef.current = setTimeout(() => {
-        setShowWords(false);
-        setDisplayedWords([]);
-        setExtraButtonsVisible(true);
-        wordsTimeoutRef.current = null;
-      }, 3000);
+      // If the browser supports speechSynthesis, speak the words in Hebrew and hide when done.
+      const synth = window.speechSynthesis;
+      if (synth) {
+        // Cancel any previous speech and timeouts
+        try { synth.cancel(); } catch (e) {}
+        if (wordsTimeoutRef.current) { clearTimeout(wordsTimeoutRef.current); wordsTimeoutRef.current = null; }
+
+        // Ensure we have voices (voices may load asynchronously)
+        const voices = await new Promise(resolve => {
+          const v = window.speechSynthesis.getVoices();
+          if (v.length) return resolve(v);
+          const onVoices = () => {
+            const v2 = window.speechSynthesis.getVoices();
+            window.speechSynthesis.removeEventListener('voiceschanged', onVoices);
+            resolve(v2);
+          };
+          window.speechSynthesis.addEventListener('voiceschanged', onVoices);
+          // Fallback: resolve after a short delay even if voiceschanged doesn't fire
+          setTimeout(() => resolve(window.speechSynthesis.getVoices()), 1000);
+        });
+
+        console.debug('speech voices:', voices);
+
+        // Prefer Hebrew voice if available
+        let voice = voices.find(v => v.lang && v.lang.toLowerCase().startsWith('he'))
+                    || voices.find(v => /hebrew/i.test(v.name))
+                    || null;
+
+        console.debug('chosen voice:', voice);
+
+        setIsSpeaking(true);
+
+        if (voice) {
+          // Chain utterances so we can detect when all words finished
+          await new Promise(resolve => {
+            let idx = 0;
+
+            const speakNext = () => {
+              if (idx >= selected.length) {
+                resolve();
+                return;
+              }
+
+              const textToSpeak = selected[idx];
+              console.debug('speaking:', textToSpeak);
+              const u = new SpeechSynthesisUtterance(textToSpeak);
+              // prefer voice locale if available
+              u.lang = voice.lang || 'he-IL';
+              u.voice = voice;
+              u.rate = 0.95;
+              u.pitch = 1;
+              u.onstart = () => { console.debug('utterance onstart:', textToSpeak); };
+
+              u.onend = () => {
+                idx += 1;
+                speakNext();
+              };
+              u.onerror = (err) => {
+                console.error('utterance error for', textToSpeak, err);
+                // Skip on error and continue
+                idx += 1;
+                speakNext();
+              };
+
+              try {
+                synth.speak(u);
+                console.debug('synth.speaking after speak call:', synth.speaking);
+              } catch (e) {
+                console.error('speak failed', e);
+                idx += 1;
+                speakNext();
+              }
+            };
+
+            // Start speaking
+            speakNext();
+
+            // Safety timeout in case speechend doesn't fire
+            wordsTimeoutRef.current = setTimeout(() => {
+              try { synth.cancel(); } catch (e) {}
+              wordsTimeoutRef.current = null;
+              resolve();
+            }, Math.max(12000, selected.length * 2000)); // at least 12s or ~2s per word
+          });
+        } else {
+          // No Hebrew voice found — use external local TTS server (gTTS) as a fallback.
+          // No server approach: use pre-generated MP3s hosted in public/tts/ if available
+          await new Promise(async resolve => {
+            const combined = selected.join(' • ');
+            console.debug('using bundled mp3s for:', selected);
+
+            try {
+              // Try to play concatenated per-word files sequentially
+              let played = false;
+              for (let i = 0; i < selected.length; i++) {
+                const word = selected[i];
+                // Try both raw Hebrew filename, percent-encoded filename, and double-encoded filename (for files literally containing % sequences)
+                const baseUrl = (process.env.PUBLIC_URL||'') + '/tts/';
+                const rawName = `${word}.mp3`;
+                const encoded = encodeURIComponent(word);
+                const encodedName = `${encoded}.mp3`;
+                // Double-encode percent signs so literal "%D7..." filenames can be addressed as "%25D7..." in URLs
+                const doubleEncodedName = encoded.replace(/%/g, '%25') + '.mp3';
+
+                const tryPlay = (url) => new Promise(res => {
+                  const audio = new Audio(url);
+                  let started = false;
+                  const cleanup = () => {
+                    audio.onended = null;
+                    audio.onerror = null;
+                  };
+                  audio.onended = () => { cleanup(); res(true); };
+                  audio.onerror = (err) => { console.error('audio play error for', word, err, 'url:', url); cleanup(); res(false); };
+
+                  audio.play().then(() => {
+                    started = true;
+                  }).catch(e => {
+                    console.debug('audio.play failed for', word, url, e);
+                    try { cleanup(); } catch (e) {}
+                    res(false);
+                  });
+
+                  setTimeout(() => {
+                    if (!started) {
+                      try { audio.pause(); } catch (e) {}
+                      try { cleanup(); } catch (e) {}
+                      res(false);
+                    }
+                  }, 1500);
+                });
+
+                // Try raw, then encoded, then double-encoded
+                const rawUrl = baseUrl + rawName;
+                const encodedUrl = baseUrl + encodedName;
+                const doubleEncodedUrl = baseUrl + doubleEncodedName;
+
+                const ok = await tryPlay(rawUrl) || await tryPlay(encodedUrl) || await tryPlay(doubleEncodedUrl);
+                if (ok) played = true;
+              }
+              if (!played) throw new Error('no bundled mp3s found');
+
+              resolve();
+            } catch (err) {
+              console.error('bundled mp3 playback failed', err);
+              resolve();
+            }
+          });
+        }
+
+
+        // Clear any pending timeout
+        if (wordsTimeoutRef.current) {
+          clearTimeout(wordsTimeoutRef.current);
+          wordsTimeoutRef.current = null;
+        }
+
+        setIsSpeaking(false);
+      } else {
+        // No speech support: show for 3 seconds as a fallback
+        wordsTimeoutRef.current = setTimeout(() => {
+          wordsTimeoutRef.current = null;
+        }, 3000);
+      }
+
+      // After speaking (or fallback), hide words and restore buttons
+      setShowWords(false);
+      setDisplayedWords([]);
+      setExtraButtonsVisible(true);
+
     } catch (e) {
       console.error('Error showing words:', e);
       // restore buttons on error
+      if (window.speechSynthesis) try { window.speechSynthesis.cancel(); } catch (e) {}
+      if (wordsTimeoutRef.current) { clearTimeout(wordsTimeoutRef.current); wordsTimeoutRef.current = null; }
+      setIsSpeaking(false);
       setExtraButtonsVisible(true);
       setShowWords(false);
       setDisplayedWords([]);
