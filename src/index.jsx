@@ -296,9 +296,7 @@ const App = () => {
             for (let i = 0; i < selected.length; i++) {
               const word = selected[i];
               const baseUrl = (process.env.PUBLIC_URL||'') + '/tts/';
-              const rawName = `${word}.mp3`;
               const encoded = encodeURIComponent(word);
-              const encodedName = `${encoded}.mp3`;
               const doubleEncodedName = encoded.replace(/%/g, '%25') + '.mp3';
 
               const tryPlay = (url) => new Promise(res => {
@@ -326,11 +324,10 @@ const App = () => {
                 }, 1500);
               });
 
-              const rawUrl = baseUrl + rawName;
-              const encodedUrl = baseUrl + encodedName;
               const doubleEncodedUrl = baseUrl + doubleEncodedName;
 
-              const ok = await tryPlay(rawUrl) || await tryPlay(encodedUrl) || await tryPlay(doubleEncodedUrl);
+              // Only try the double-encoded filename (files are stored percent-encoded in public/tts)
+              const ok = await tryPlay(doubleEncodedUrl);
               if (ok) playedAny = true;
             }
             if (playedAny) console.info('Finished playing bundled mp3s for:', selected);
